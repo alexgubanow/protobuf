@@ -1,0 +1,40 @@
+# The line "* text=auto !eol" means the following:
+#  For text files (auto-detected), EOLs will be converted on checkout to OS-dependent EOL (LF for Unix, CRLF for Windows).
+#  No EOL (end of line) conversion for binary files.
+* text=auto !eol
+
+# Note:
+#  "text" tells git the file is text.
+#  "-text" tells git the file is binary.
+#  The only difference between the two is that git will do EOL conversion for text files.
+#  "!eol" is the equivalent of "svneol=native".
+
+*.bat text !eol zos-working-tree-encoding=IBM-1047
+*.c text !eol zos-working-tree-encoding=UTF-8 diff=cpp
+*.cc text !eol zos-working-tree-encoding=UTF-8 diff=cpp
+*.cpp text !eol zos-working-tree-encoding=UTF-8 diff=cpp
+*.h text !eol zos-working-tree-encoding=UTF-8 diff=cpp
+*.htm text !eol zos-working-tree-encoding=UTF-8 diff=html
+*.html text !eol zos-working-tree-encoding=UTF-8 diff=html
+*.m4 text !eol zos-working-tree-encoding=IBM-1047
+*.mak text !eol zos-working-tree-encoding=IBM-1047
+*.md text !eol zos-working-tree-encoding=UTF-8
+*.MF text !eol zos-working-tree-encoding=IBM-1047
+*.mk text !eol zos-working-tree-encoding=IBM-1047
+*.py text !eol zos-working-tree-encoding=UTF-8 diff=python
+*.rc text !eol zos-working-tree-encoding=IBM-1047
+*.sh text eol=lf
+*.sed text eol=lf
+*.stub text !eol zos-working-tree-encoding=IBM-1047
+*.targets text !eol zos-working-tree-encoding=UTF-8
+*.txt text !eol zos-working-tree-encoding=UTF-8
+*.xml text !eol zos-working-tree-encoding=UTF-8
+*.xsl text !eol zos-working-tree-encoding=IBM-1047
+*.xslt text !eol zos-working-tree-encoding=IBM-1047
+AUTHORS text !eol zos-working-tree-encoding=IBM-1047
+BUILD text !eol zos-working-tree-encoding=IBM-1047
+COPYING text !eol zos-working-tree-encoding=IBM-1047
+Changelog text !eol zos-working-tree-encoding=IBM-1047
+LICENSE text !eol zos-working-tree-encoding=IBM-1047
+Makefile text !eol zos-working-tree-encoding=IBM-1047
+README text !eol zos-working-tree-encoding=UTF-8

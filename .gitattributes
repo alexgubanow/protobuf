@@ -26,9 +26,8 @@
 *.sh text eol=lf
 *.sed text eol=lf
 *.stub text !eol zos-working-tree-encoding=IBM-1047
-*.targets text !eol zos-working-tree-encoding=UTF-8
-*.txt text !eol zos-working-tree-encoding=UTF-8
-*.xml text !eol zos-working-tree-encoding=UTF-8
+*.txt text !eol zos-working-tree-encoding=IBM-1047
+*.xml text !eol zos-working-tree-encoding=IBM-1047
 *.xsl text !eol zos-working-tree-encoding=IBM-1047
 *.xslt text !eol zos-working-tree-encoding=IBM-1047
 AUTHORS text !eol zos-working-tree-encoding=IBM-1047

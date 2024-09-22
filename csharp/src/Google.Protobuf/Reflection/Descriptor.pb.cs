@@ -8027,12 +8027,13 @@ namespace Google.Protobuf.Reflection {
 
     private global::Google.Protobuf.Reflection.FieldOptions.Types.CType ctype_;
     /// <summary>
+    /// NOTE: ctype is deprecated. Use `features.(pb.cpp).string_type` instead.
     /// The ctype option instructs the C++ code generator to use a different
     /// representation of the field than it normally would.  See the specific
     /// options below.  This option is only implemented to support use of
     /// [ctype=CORD] and [ctype=STRING] (the default) on non-repeated fields of
-    /// type "bytes" in the open source release -- sorry, we'll try to include
-    /// other types in a future version!
+    /// type "bytes" in the open source release.
+    /// TODO: make ctype actually deprecated.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -8921,8 +8922,6 @@ namespace Google.Protobuf.Reflection {
 
       /// <summary>
       /// If set to RETENTION_SOURCE, the option will be omitted from the binary.
-      /// Note: as of January 2023, support for this is in progress and does not yet
-      /// have an effect (b/264593489).
       /// </summary>
       public enum OptionRetention {
         [pbr::OriginalName("RETENTION_UNKNOWN")] RetentionUnknown = 0,
@@ -8933,8 +8932,7 @@ namespace Google.Protobuf.Reflection {
       /// <summary>
       /// This indicates the types of entities that the field may apply to when used
       /// as an option. If it is unset, then the field may be freely used as an
-      /// option on any kind of entity. Note: as of January 2023, support for this is
-      /// in progress and does not yet have an effect (b/264593489).
+      /// option on any kind of entity.
       /// </summary>
       public enum OptionTargetType {
         [pbr::OriginalName("TARGET_TYPE_UNKNOWN")] TargetTypeUnknown = 0,

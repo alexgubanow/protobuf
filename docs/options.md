@@ -501,3 +501,13 @@ with info about your project (name and website) so we can add an entry for you.
 
     *   Website: https://github.com/solo-io/protoc-gen-openapi
     *   Extensions: 1188-1189
+
+1.  Wire enumMode
+
+    *   Website: https://square.github.io/wire/
+    *   Extensions: 1190
+
+1.  Nebius AI
+
+    *   Website: https://nebius.ai
+    *   Extensions: 1191-1199

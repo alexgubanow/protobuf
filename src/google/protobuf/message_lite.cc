@@ -45,13 +45,21 @@
 namespace google {
 namespace protobuf {
 
-void MessageLite::DestroyInstance(bool free_memory) {
+void MessageLite::DestroyInstance() {
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-  _class_data_->delete_message(this, free_memory);
+  _class_data_->destroy_message(*this);
 #else   // PROTOBUF_CUSTOM_VTABLE
-  ABSL_DCHECK(!free_memory);
   this->~MessageLite();
 #endif  // PROTOBUF_CUSTOM_VTABLE
+}
+
+void MessageLite::DeleteInstance() {
+  // Cache the size and pointer because we can't access them after the
+  // destruction.
+  const size_t size = GetClassData()->allocation_size();
+  void* const ptr = this;
+  DestroyInstance();
+  internal::SizedDelete(ptr, size);
 }
 
 void MessageLite::CheckTypeAndMergeFrom(const MessageLite& other) {
@@ -64,22 +72,14 @@ void MessageLite::CheckTypeAndMergeFrom(const MessageLite& other) {
   data->merge_to_from(*this, other);
 }
 
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-uint8_t* MessageLite::_InternalSerialize(
-    uint8_t* ptr, io::EpsCopyOutputStream* stream) const {
-  return _class_data_->serialize(*this, ptr, stream);
-}
-
 MessageLite* MessageLite::New(Arena* arena) const {
-  return static_cast<MessageLite*>(_class_data_->new_message(this, arena));
+  auto* data = GetClassData();
+  // The `instance->New()` expression requires using the actual instance
+  // instead of the prototype for the inner function call.
+  // Certain custom instances have special per-instance state that needs to be
+  // copied.
+  return data->message_creator.New(this, data->prototype, arena);
 }
-
-void MessageLite::Clear() { _class_data_->clear(*this); }
-
-size_t MessageLite::ByteSizeLong() const {
-  return _class_data_->byte_size_long(*this);
-}
-#endif  // PROTOBUF_CUSTOM_VTABLE
 
 bool MessageLite::IsInitialized() const {
   auto* data = GetClassData();
@@ -91,17 +91,18 @@ const char* MessageLite::_InternalParse(const char* ptr,
   return internal::TcParser::ParseLoop(this, ptr, ctx, GetTcParseTable());
 }
 
-std::string MessageLite::GetTypeName() const {
-  auto* data = GetClassData();
-  ABSL_DCHECK(data != nullptr);
+internal::GetTypeNameReturnType MessageLite::GetTypeName() const {
+  return internal::GetTypeNameReturnType(TypeId::Get(*this).name());
+}
 
-  if (!data->is_lite) {
+absl::string_view TypeId::name() const {
+  if (!data_->is_lite) {
     // For !LITE messages, we use the descriptor method function.
-    return data->full().descriptor_methods->get_type_name(*this);
+    return data_->full().descriptor_methods->get_type_name(data_);
   }
 
   // For LITE messages, the type name is a char[] just beyond ClassData.
-  return reinterpret_cast<const char*>(data) + sizeof(ClassData);
+  return reinterpret_cast<const char*>(data_) + sizeof(MessageLite::ClassData);
 }
 
 void MessageLite::OnDemandRegisterArenaDtor(Arena* arena) {
@@ -127,18 +128,18 @@ std::string MessageLite::InitializationErrorString() const {
 }
 
 std::string MessageLite::DebugString() const {
+  auto* data = GetClassData();
+  ABSL_DCHECK(data != nullptr);
+  if (!data->is_lite) {
+    return data->full().descriptor_methods->debug_string(*this);
+  }
+
   return absl::StrCat("MessageLite at 0x", absl::Hex(this));
 }
 
+#if !defined(PROTOBUF_CUSTOM_VTABLE)
 int MessageLite::GetCachedSize() const { return AccessCachedSize().Get(); }
-
-internal::CachedSize& MessageLite::AccessCachedSize() const {
-  auto* data = GetClassData();
-  ABSL_DCHECK(data != nullptr);
-  ABSL_DCHECK(data->cached_size_offset != 0);
-  return *reinterpret_cast<internal::CachedSize*>(const_cast<char*>(
-      reinterpret_cast<const char*>(this) + data->cached_size_offset));
-}
+#endif
 
 namespace {
 
@@ -193,6 +194,17 @@ void MessageLite::LogInitializationErrorMessage() const {
 }
 
 namespace internal {
+
+void FailDynamicCast(const MessageLite& from, const MessageLite& to) {
+  const auto to_name = to.GetTypeName();
+  if (internal::GetClassData(from)->is_dynamic) {
+    ABSL_LOG(FATAL)
+        << "Cannot downcast from a DynamicMessage to generated type "
+        << to_name;
+  }
+  const auto from_name = from.GetTypeName();
+  ABSL_LOG(FATAL) << "Cannot downcast " << from_name << " to " << to_name;
+}
 
 template <bool aliasing>
 bool MergeFromImpl(absl::string_view input, MessageLite* msg,
@@ -635,7 +647,7 @@ bool MessageLite::AppendPartialToCord(absl::Cord* output) const {
   const size_t size = ByteSizeLong();
   const size_t total_size = size + output->size();
   if (size > INT_MAX) {
-    ABSL_LOG(ERROR) << "Exceeded maximum protobuf size of 2GB.";
+    ABSL_LOG(ERROR) << "Exceeded maximum protobuf size of 2GB: " << size;
     return false;
   }
 

@@ -16,6 +16,7 @@
 #include "google/protobuf/compiler/rust/rust_field_type.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/port.h"
 
 namespace google {
 namespace protobuf {
@@ -26,11 +27,14 @@ namespace {
 
 std::unique_ptr<AccessorGenerator> AccessorGeneratorFor(
     Context& ctx, const FieldDescriptor& field) {
-  // TODO: We do not support [ctype=FOO] (used to set the field
-  // type in C++ to cord or string_piece) in V0.6 API.
-  if (field.options().has_ctype()) {
+  // TODO: We do not support ctype=CORD fields or repeated
+  // ctype=STRING_PIECE fields on cpp kernel yet (upb doesn't care about ctype).
+  auto ctype = field.options().ctype();
+  if (ctx.is_cpp() &&
+      (ctype == FieldOptions::CORD || ctype == FieldOptions::STRING_PIECE) &&
+      field.is_repeated()) {
     return std::make_unique<UnsupportedField>(
-        "fields with ctype not supported");
+        "fields has an unsupported ctype");
   }
 
   if (field.is_map()) {
@@ -53,12 +57,16 @@ std::unique_ptr<AccessorGenerator> AccessorGeneratorFor(
       return std::make_unique<SingularScalar>();
     case RustFieldType::BYTES:
     case RustFieldType::STRING:
+      if (ctype == FieldOptions::CORD) {
+        return std::make_unique<SingularCord>();
+      }
       return std::make_unique<SingularString>();
     case RustFieldType::MESSAGE:
       return std::make_unique<SingularMessage>();
   }
 
-  ABSL_LOG(FATAL) << "Unexpected field type: " << field.type();
+  ABSL_LOG(ERROR) << "Unknown field type: " << field.type();
+  internal::Unreachable();
 }
 
 }  // namespace

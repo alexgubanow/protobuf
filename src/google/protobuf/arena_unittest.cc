@@ -182,20 +182,21 @@ void TestCtorAndDtorTraits(std::vector<absl::string_view> def,
       : std::conditional_t<arena_ctor, ArenaCtorBase, EmptyBase<0>>,
         std::conditional_t<arena_dtor, ArenaDtorBase, EmptyBase<1>>,
         Message {
-    TraitsProber() : Message(nullptr) { actions.push_back("()"); }
-    TraitsProber(const TraitsProber&) : Message(nullptr) {
+    TraitsProber() : Message(nullptr, nullptr) { actions.push_back("()"); }
+    TraitsProber(const TraitsProber&) : Message(nullptr, nullptr) {
       actions.push_back("(const T&)");
     }
-    explicit TraitsProber(int) : Message(nullptr) {
+    explicit TraitsProber(int) : Message(nullptr, nullptr) {
       actions.push_back("(int)");
     }
-    explicit TraitsProber(Arena* arena) : Message(nullptr) {
+    explicit TraitsProber(Arena* arena) : Message(nullptr, nullptr) {
       actions.push_back("(Arena)");
     }
-    TraitsProber(Arena* arena, const TraitsProber&) : Message(nullptr) {
+    TraitsProber(Arena* arena, const TraitsProber&)
+        : Message(nullptr, nullptr) {
       actions.push_back("(Arena, const T&)");
     }
-    TraitsProber(Arena* arena, int) : Message(nullptr) {
+    TraitsProber(Arena* arena, int) : Message(nullptr, nullptr) {
       actions.push_back("(Arena, int)");
     }
     ~TraitsProber() { actions.push_back("~()"); }
@@ -519,12 +520,14 @@ class DispatcherTestProto : public Message {
   using InternalArenaConstructable_ = void;
   using DestructorSkippable_ = void;
   // For the test below to construct.
-  explicit DispatcherTestProto(absl::in_place_t) : Message(nullptr) {}
-  explicit DispatcherTestProto(Arena*) : Message(nullptr) { ABSL_LOG(FATAL); }
-  DispatcherTestProto(Arena*, const DispatcherTestProto&) : Message(nullptr) {
+  explicit DispatcherTestProto(absl::in_place_t) : Message(nullptr, nullptr) {}
+  explicit DispatcherTestProto(Arena*) : Message(nullptr, nullptr) {
     ABSL_LOG(FATAL);
   }
-  DispatcherTestProto* New(Arena*) const PROTOBUF_FINAL { ABSL_LOG(FATAL); }
+  DispatcherTestProto(Arena*, const DispatcherTestProto&)
+      : Message(nullptr, nullptr) {
+    ABSL_LOG(FATAL);
+  }
   const ClassData* GetClassData() const PROTOBUF_FINAL { ABSL_LOG(FATAL); }
 };
 // We use a specialization to inject behavior for the test.
@@ -648,7 +651,7 @@ TEST(ArenaTest, UnknownFields) {
   arena_message_3->mutable_unknown_fields()->AddVarint(1000, 42);
   arena_message_3->mutable_unknown_fields()->AddFixed32(1001, 42);
   arena_message_3->mutable_unknown_fields()->AddFixed64(1002, 42);
-  arena_message_3->mutable_unknown_fields()->AddLengthDelimited(1003);
+  arena_message_3->mutable_unknown_fields()->AddLengthDelimited(1003, "");
   arena_message_3->mutable_unknown_fields()->DeleteSubrange(0, 2);
   arena_message_3->mutable_unknown_fields()->DeleteByNumber(1002);
   arena_message_3->mutable_unknown_fields()->DeleteByNumber(1003);
@@ -1601,13 +1604,6 @@ TEST(ArenaTest, NoHeapAllocationsTest) {
   }
 
   arena.Reset();
-}
-
-TEST(ArenaTest, ParseCorruptedString) {
-  TestAllTypes message;
-  TestUtil::SetAllFields(&message);
-  TestParseCorruptedString<TestAllTypes, true>(message);
-  TestParseCorruptedString<TestAllTypes, false>(message);
 }
 
 #if PROTOBUF_RTTI

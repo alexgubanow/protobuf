@@ -112,7 +112,7 @@ class PROTOBUF_EXPORT EpsCopyInputStream {
 
   // In sanitizer mode we use memory poisoning to guarantee that:
   //  - We do not read an uninitialized token.
-  //  - We would like to verify that this token was consumed, but unforuntately
+  //  - We would like to verify that this token was consumed, but unfortunately
   //    __asan_address_is_poisoned is allowed to have false negatives.
   class LimitToken {
    public:
@@ -256,9 +256,9 @@ class PROTOBUF_EXPORT EpsCopyInputStream {
   bool DataAvailable(const char* ptr) { return ptr < limit_end_; }
 
  protected:
-  // Returns true is limit (either an explicit limit or end of stream) is
+  // Returns true if limit (either an explicit limit or end of stream) is
   // reached. It aligns *ptr across buffer seams.
-  // If limit is exceeded it returns true and ptr is set to null.
+  // If limit is exceeded, it returns true and ptr is set to null.
   bool DoneWithCheck(const char** ptr, int d) {
     ABSL_DCHECK(*ptr);
     if (PROTOBUF_PREDICT_TRUE(*ptr < limit_end_)) return false;
@@ -266,7 +266,7 @@ class PROTOBUF_EXPORT EpsCopyInputStream {
     ABSL_DCHECK_LE(overrun, kSlopBytes);  // Guaranteed by parse loop.
     if (overrun ==
         limit_) {  //  No need to flip buffers if we ended on a limit.
-      // If we actually overrun the buffer and next_chunk_ is null. It means
+      // If we actually overrun the buffer and next_chunk_ is null, it means
       // the stream ended and we passed the stream end.
       if (overrun > 0 && next_chunk_ == nullptr) *ptr = nullptr;
       return true;
@@ -635,7 +635,7 @@ inline const char* VarintParseSlow(const char* p, uint32_t res, uint64_t* out) {
   return tmp.first;
 }
 
-#ifdef __aarch64__
+#if defined(__aarch64__) && !defined(_MSC_VER)
 // Generally, speaking, the ARM-optimized Varint decode algorithm is to extract
 // and concatenate all potentially valid data bits, compute the actual length
 // of the Varint, and mask off the data bits which are not actually part of the
@@ -866,7 +866,7 @@ static const char* VarintParseSlowArm(const char* p, uint64_t* out,
 // The caller must ensure that p points to at least 10 valid bytes.
 template <typename T>
 PROTOBUF_NODISCARD const char* VarintParse(const char* p, T* out) {
-#if defined(__aarch64__) && defined(ABSL_IS_LITTLE_ENDIAN)
+#if defined(__aarch64__) && defined(ABSL_IS_LITTLE_ENDIAN) && !defined(_MSC_VER)
   // This optimization is not supported in big endian mode
   uint64_t first8;
   std::memcpy(&first8, p, sizeof(first8));

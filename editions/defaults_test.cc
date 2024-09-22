@@ -103,7 +103,7 @@ TEST(DefaultsTest, CheckFuture) {
 TEST(DefaultsTest, CheckFarFuture) {
   auto defaults = ReadDefaults("test_defaults_far_future");
   ASSERT_OK(defaults);
-  ASSERT_EQ(defaults->defaults().size(), 6);
+  ASSERT_EQ(defaults->defaults().size(), 7);
   ASSERT_EQ(defaults->minimum_edition(), EDITION_99997_TEST_ONLY);
   ASSERT_EQ(defaults->maximum_edition(), EDITION_99999_TEST_ONLY);
 
@@ -251,3 +251,5 @@ TEST_F(OverridableDefaultsTest, Edition2023) {
 }  // namespace
 }  // namespace protobuf
 }  // namespace google
+
+#include "google/protobuf/port_undef.inc"

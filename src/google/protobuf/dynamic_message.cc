@@ -117,9 +117,11 @@ int FieldSpaceUsed(const FieldDescriptor* field) {
         }
 
       case FD::CPPTYPE_STRING:
-        switch (field->options().ctype()) {
-          default:  // TODO:  Support other string reps.
-          case FieldOptions::STRING:
+        switch (field->cpp_string_type()) {
+          case FieldDescriptor::CppStringType::kCord:
+            return sizeof(RepeatedField<absl::Cord>);
+          case FieldDescriptor::CppStringType::kView:
+          case FieldDescriptor::CppStringType::kString:
             return sizeof(RepeatedPtrField<std::string>);
         }
         break;
@@ -147,9 +149,11 @@ int FieldSpaceUsed(const FieldDescriptor* field) {
         return sizeof(Message*);
 
       case FD::CPPTYPE_STRING:
-        switch (field->options().ctype()) {
-          default:  // TODO:  Support other string reps.
-          case FieldOptions::STRING:
+        switch (field->cpp_string_type()) {
+          case FieldDescriptor::CppStringType::kCord:
+            return sizeof(absl::Cord);
+          case FieldDescriptor::CppStringType::kView:
+          case FieldDescriptor::CppStringType::kString:
             return sizeof(ArenaStringPtr);
         }
         break;
@@ -181,8 +185,6 @@ inline int AlignOffset(int offset) { return AlignTo(offset, kSafeAlignment); }
 
 class DynamicMessage final : public Message {
  public:
-  explicit DynamicMessage(const DynamicMessageFactory::TypeInfo* type_info);
-
   // This should only be used by GetPrototypeNoLock() to avoid dead lock.
   DynamicMessage(DynamicMessageFactory::TypeInfo* type_info, bool lock_factory);
   DynamicMessage(const DynamicMessage&) = delete;
@@ -201,8 +203,6 @@ class DynamicMessage final : public Message {
   void CrossLinkPrototypes();
 
   // implements Message ----------------------------------------------
-
-  Message* New(Arena* arena) const PROTOBUF_FINAL;
 
   const ClassData* GetClassData() const PROTOBUF_FINAL;
 
@@ -237,7 +237,8 @@ class DynamicMessage final : public Message {
     return reinterpret_cast<const uint8_t*>(this) + offset;
   }
 
-  static void DeleteImpl(void* ptr, bool free_memory);
+  static void* NewImpl(const void* prototype, void* mem, Arena* arena);
+  static void DestroyImpl(MessageLite& ptr);
 
   void* MutableRaw(int i);
   void* MutableExtensionsRaw();
@@ -246,11 +247,10 @@ class DynamicMessage final : public Message {
   void* MutableOneofFieldRaw(const FieldDescriptor* f);
 
   const DynamicMessageFactory::TypeInfo* type_info_;
-  mutable internal::CachedSize cached_byte_size_;
+  internal::CachedSize cached_byte_size_;
 };
 
 struct DynamicMessageFactory::TypeInfo {
-  int size;
   int has_bits_offset;
   int oneof_case_offset;
   int extensions_offset;
@@ -263,22 +263,18 @@ struct DynamicMessageFactory::TypeInfo {
   //   important (the prototype must be deleted *before* the offsets).
   std::unique_ptr<uint32_t[]> offsets;
   std::unique_ptr<uint32_t[]> has_bits_indices;
-  // Don't use a unique_ptr to hold the prototype: the destructor for
-  // DynamicMessage needs to know whether it is the prototype, and does so by
-  // looking back at this field. This would assume details about the
-  // implementation of unique_ptr.
-  const DynamicMessage* prototype;
   int weak_field_map_offset;  // The offset for the weak_field_map;
 
   DynamicMessage::ClassDataFull class_data = {
       DynamicMessage::ClassData{
+          nullptr,  // default_instance
           nullptr,  // tc_table
           nullptr,  // on_demand_register_arena_dtor
           &DynamicMessage::IsInitializedImpl,
           &DynamicMessage::MergeImpl,
-          &DynamicMessage::DeleteImpl,
-          DynamicMessage::GetNewImpl<DynamicMessage>(),
-          DynamicMessage::ClearImpl,
+          internal::MessageCreator(),  // to be filled later
+          &DynamicMessage::DestroyImpl,
+          static_cast<void (MessageLite::*)()>(&DynamicMessage::ClearImpl),
           DynamicMessage::ByteSizeLongImpl,
           DynamicMessage::_InternalSerializeImpl,
           PROTOBUF_FIELD_OFFSET(DynamicMessage, cached_byte_size_),
@@ -289,10 +285,10 @@ struct DynamicMessageFactory::TypeInfo {
       nullptr,  // get_metadata_tracker
   };
 
-  TypeInfo() : prototype(nullptr) {}
+  TypeInfo() = default;
 
   ~TypeInfo() {
-    delete prototype;
+    delete class_data.prototype;
     delete class_data.reflection;
 
     auto* type = class_data.descriptor;
@@ -310,13 +306,6 @@ struct DynamicMessageFactory::TypeInfo {
     }
   }
 };
-
-DynamicMessage::DynamicMessage(const DynamicMessageFactory::TypeInfo* type_info)
-    : Message(type_info->class_data.base()),
-      type_info_(type_info),
-      cached_byte_size_(0) {
-  SharedCtor(true);
-}
 
 DynamicMessage::DynamicMessage(const DynamicMessageFactory::TypeInfo* type_info,
                                Arena* arena)
@@ -337,7 +326,7 @@ DynamicMessage::DynamicMessage(DynamicMessageFactory::TypeInfo* type_info,
   // created, which needs the address of the prototype of Foo (the value in
   // map). To break the cyclic dependency, we have to assign the address of
   // prototype into type_info first.
-  type_info->prototype = this;
+  type_info->class_data.prototype = this;
   SharedCtor(lock_factory);
 }
 
@@ -414,9 +403,31 @@ void DynamicMessage::SharedCtor(bool lock_factory) {
         break;
 
       case FieldDescriptor::CPPTYPE_STRING:
-        switch (field->options().ctype()) {
-          default:  // TODO:  Support other string reps.
-          case FieldOptions::STRING:
+        switch (field->cpp_string_type()) {
+          case FieldDescriptor::CppStringType::kCord:
+            if (!field->is_repeated()) {
+              if (field->has_default_value()) {
+                new (field_ptr) absl::Cord(field->default_value_string());
+              } else {
+                new (field_ptr) absl::Cord;
+              }
+              if (arena != nullptr) {
+                // Cord does not support arena so here we need to notify arena
+                // to remove the data it allocated on the heap by calling its
+                // destructor.
+                arena->OwnDestructor(static_cast<absl::Cord*>(field_ptr));
+              }
+            } else {
+              new (field_ptr) RepeatedField<absl::Cord>(arena);
+              if (arena != nullptr) {
+                // Needs to destroy Cord elements.
+                arena->OwnDestructor(
+                    static_cast<RepeatedField<absl::Cord>*>(field_ptr));
+              }
+            }
+            break;
+          case FieldDescriptor::CppStringType::kView:
+          case FieldDescriptor::CppStringType::kString:
             if (!field->is_repeated()) {
               ArenaStringPtr* asp = new (field_ptr) ArenaStringPtr();
               asp->InitDefault();
@@ -467,16 +478,16 @@ void DynamicMessage::SharedCtor(bool lock_factory) {
 }
 
 bool DynamicMessage::is_prototype() const {
-  return type_info_->prototype == this ||
+  return type_info_->class_data.prototype == this ||
          // If type_info_->prototype is nullptr, then we must be constructing
          // the prototype now, which means we must be the prototype.
-         type_info_->prototype == nullptr;
+         type_info_->class_data.prototype == nullptr;
 }
 
 #if defined(__cpp_lib_destroying_delete) && defined(__cpp_sized_deallocation)
 void DynamicMessage::operator delete(DynamicMessage* msg,
                                      std::destroying_delete_t) {
-  const size_t size = msg->type_info_->size;
+  const size_t size = msg->type_info_->class_data.allocation_size();
   msg->~DynamicMessage();
   ::operator delete(msg, size);
 }
@@ -506,9 +517,12 @@ DynamicMessage::~DynamicMessage() {
       if (*(reinterpret_cast<const int32_t*>(field_ptr)) == field->number()) {
         field_ptr = MutableOneofFieldRaw(field);
         if (field->cpp_type() == FieldDescriptor::CPPTYPE_STRING) {
-          switch (field->options().ctype()) {
-            default:
-            case FieldOptions::STRING: {
+          switch (field->cpp_string_type()) {
+            case FieldDescriptor::CppStringType::kCord:
+              delete *reinterpret_cast<absl::Cord**>(field_ptr);
+              break;
+            case FieldDescriptor::CppStringType::kView:
+            case FieldDescriptor::CppStringType::kString: {
               reinterpret_cast<ArenaStringPtr*>(field_ptr)->Destroy();
               break;
             }
@@ -540,9 +554,13 @@ DynamicMessage::~DynamicMessage() {
 #undef HANDLE_TYPE
 
         case FieldDescriptor::CPPTYPE_STRING:
-          switch (field->options().ctype()) {
-            default:  // TODO:  Support other string reps.
-            case FieldOptions::STRING:
+          switch (field->cpp_string_type()) {
+            case FieldDescriptor::CppStringType::kCord:
+              reinterpret_cast<RepeatedField<absl::Cord>*>(field_ptr)
+                  ->~RepeatedField<absl::Cord>();
+              break;
+            case FieldDescriptor::CppStringType::kView:
+            case FieldDescriptor::CppStringType::kString:
               reinterpret_cast<RepeatedPtrField<std::string>*>(field_ptr)
                   ->~RepeatedPtrField<std::string>();
               break;
@@ -560,9 +578,12 @@ DynamicMessage::~DynamicMessage() {
       }
 
     } else if (field->cpp_type() == FieldDescriptor::CPPTYPE_STRING) {
-      switch (field->options().ctype()) {
-        default:  // TODO:  Support other string reps.
-        case FieldOptions::STRING: {
+      switch (field->cpp_string_type()) {
+        case FieldDescriptor::CppStringType::kCord:
+          reinterpret_cast<absl::Cord*>(field_ptr)->~Cord();
+          break;
+        case FieldDescriptor::CppStringType::kView:
+        case FieldDescriptor::CppStringType::kString: {
           reinterpret_cast<ArenaStringPtr*>(field_ptr)->Destroy();
           break;
         }
@@ -578,13 +599,15 @@ DynamicMessage::~DynamicMessage() {
   }
 }
 
-void DynamicMessage::DeleteImpl(void* ptr, bool free_memory) {
-  auto* msg = static_cast<DynamicMessage*>(ptr);
-  const size_t size = msg->type_info_->size;
-  msg->~DynamicMessage();
-  if (free_memory) {
-    internal::SizedDelete(ptr, size);
-  }
+void* DynamicMessage::NewImpl(const void* prototype, void* mem, Arena* arena) {
+  const auto* type_info =
+      static_cast<const DynamicMessage*>(prototype)->type_info_;
+  memset(mem, 0, type_info->class_data.allocation_size());
+  return new (mem) DynamicMessage(type_info, arena);
+}
+
+void DynamicMessage::DestroyImpl(MessageLite& msg) {
+  static_cast<DynamicMessage&>(msg).~DynamicMessage();
 }
 
 void DynamicMessage::CrossLinkPrototypes() {
@@ -608,18 +631,6 @@ void DynamicMessage::CrossLinkPrototypes() {
       *reinterpret_cast<const Message**>(field_ptr) =
           factory->GetPrototypeNoLock(field->message_type());
     }
-  }
-}
-
-Message* DynamicMessage::New(Arena* arena) const {
-  if (arena != nullptr) {
-    void* new_base = Arena::CreateArray<char>(arena, type_info_->size);
-    memset(new_base, 0, type_info_->size);
-    return new (new_base) DynamicMessage(type_info_, arena);
-  } else {
-    void* new_base = operator new(type_info_->size);
-    memset(new_base, 0, type_info_->size);
-    return new (new_base) DynamicMessage(type_info_);
   }
 }
 
@@ -659,13 +670,14 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
   const TypeInfo** target = &prototypes_[type];
   if (*target != nullptr) {
     // Already exists.
-    return (*target)->prototype;
+    return static_cast<const Message*>((*target)->class_data.prototype);
   }
 
   TypeInfo* type_info = new TypeInfo;
   *target = type_info;
 
   type_info->class_data.descriptor = type;
+  type_info->class_data.is_dynamic = true;
   type_info->pool = (pool_ == nullptr) ? type->file()->pool() : pool_;
   type_info->factory = this;
 
@@ -754,9 +766,8 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
 
   type_info->weak_field_map_offset = -1;
 
-  // Align the final size to make sure no clever allocators think that
-  // alignment is not necessary.
-  type_info->size = size;
+  type_info->class_data.message_creator =
+      internal::MessageCreator(DynamicMessage::NewImpl, size, kSafeAlignment);
 
   // Construct the reflection object.
 
@@ -783,14 +794,14 @@ const Message* DynamicMessageFactory::GetPrototypeNoLock(
   DynamicMessage* prototype = new (base) DynamicMessage(type_info, false);
 
   internal::ReflectionSchema schema = {
-      type_info->prototype,
+      static_cast<const Message*>(type_info->class_data.prototype),
       type_info->offsets.get(),
       type_info->has_bits_indices.get(),
       type_info->has_bits_offset,
       PROTOBUF_FIELD_OFFSET(DynamicMessage, _internal_metadata_),
       type_info->extensions_offset,
       type_info->oneof_case_offset,
-      type_info->size,
+      static_cast<int>(type_info->class_data.allocation_size()),
       type_info->weak_field_map_offset,
       nullptr,  // inlined_string_indices_
       0,        // inlined_string_donated_offset_

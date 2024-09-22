@@ -14,6 +14,7 @@
 // Must be last.
 #include "upb/port/def.inc"
 
+extern const struct upb_MiniTable UPB_PRIVATE(_kUpb_MiniTable_StaticallyTreeShaken);
 static const upb_MiniTableField google_protobuf_compiler_Version__fields[4] = {
   {1, 12, 64, kUpb_NoSub, 5, (int)kUpb_FieldMode_Scalar | ((int)kUpb_FieldRep_4Byte << kUpb_FieldRep_Shift)},
   {2, 16, 65, kUpb_NoSub, 5, (int)kUpb_FieldMode_Scalar | ((int)kUpb_FieldRep_4Byte << kUpb_FieldRep_Shift)},
@@ -31,7 +32,7 @@ const upb_MiniTable google__protobuf__compiler__Version_msg_init = {
 };
 
 const upb_MiniTable* google__protobuf__compiler__Version_msg_init_ptr = &google__protobuf__compiler__Version_msg_init;
-static const upb_MiniTableSubInternal google_protobuf_compiler_CodeGeneratorRequest_submsgs[3] = {
+static const upb_MiniTableSubInternal google_protobuf_compiler_CodeGeneratorRequest__submsgs[3] = {
   {.UPB_PRIVATE(submsg) = &google__protobuf__compiler__Version_msg_init_ptr},
   {.UPB_PRIVATE(submsg) = &google__protobuf__FileDescriptorProto_msg_init_ptr},
   {.UPB_PRIVATE(submsg) = &google__protobuf__FileDescriptorProto_msg_init_ptr},
@@ -46,7 +47,7 @@ static const upb_MiniTableField google_protobuf_compiler_CodeGeneratorRequest__f
 };
 
 const upb_MiniTable google__protobuf__compiler__CodeGeneratorRequest_msg_init = {
-  &google_protobuf_compiler_CodeGeneratorRequest_submsgs[0],
+  &google_protobuf_compiler_CodeGeneratorRequest__submsgs[0],
   &google_protobuf_compiler_CodeGeneratorRequest__fields[0],
   UPB_SIZE(40, 64), 5, kUpb_ExtMode_NonExtendable, 3, UPB_FASTTABLE_MASK(248), 0,
 #ifdef UPB_TRACING_ENABLED
@@ -89,7 +90,7 @@ const upb_MiniTable google__protobuf__compiler__CodeGeneratorRequest_msg_init = 
 };
 
 const upb_MiniTable* google__protobuf__compiler__CodeGeneratorRequest_msg_init_ptr = &google__protobuf__compiler__CodeGeneratorRequest_msg_init;
-static const upb_MiniTableSubInternal google_protobuf_compiler_CodeGeneratorResponse_submsgs[1] = {
+static const upb_MiniTableSubInternal google_protobuf_compiler_CodeGeneratorResponse__submsgs[1] = {
   {.UPB_PRIVATE(submsg) = &google__protobuf__compiler__CodeGeneratorResponse__File_msg_init_ptr},
 };
 
@@ -102,7 +103,7 @@ static const upb_MiniTableField google_protobuf_compiler_CodeGeneratorResponse__
 };
 
 const upb_MiniTable google__protobuf__compiler__CodeGeneratorResponse_msg_init = {
-  &google_protobuf_compiler_CodeGeneratorResponse_submsgs[0],
+  &google_protobuf_compiler_CodeGeneratorResponse__submsgs[0],
   &google_protobuf_compiler_CodeGeneratorResponse__fields[0],
   UPB_SIZE(40, 56), 5, kUpb_ExtMode_NonExtendable, 4, UPB_FASTTABLE_MASK(120), 0,
 #ifdef UPB_TRACING_ENABLED
@@ -129,7 +130,7 @@ const upb_MiniTable google__protobuf__compiler__CodeGeneratorResponse_msg_init =
 };
 
 const upb_MiniTable* google__protobuf__compiler__CodeGeneratorResponse_msg_init_ptr = &google__protobuf__compiler__CodeGeneratorResponse_msg_init;
-static const upb_MiniTableSubInternal google_protobuf_compiler_CodeGeneratorResponse_File_submsgs[1] = {
+static const upb_MiniTableSubInternal google_protobuf_compiler_CodeGeneratorResponse_File__submsgs[1] = {
   {.UPB_PRIVATE(submsg) = &google__protobuf__GeneratedCodeInfo_msg_init_ptr},
 };
 
@@ -141,7 +142,7 @@ static const upb_MiniTableField google_protobuf_compiler_CodeGeneratorResponse_F
 };
 
 const upb_MiniTable google__protobuf__compiler__CodeGeneratorResponse__File_msg_init = {
-  &google_protobuf_compiler_CodeGeneratorResponse_File_submsgs[0],
+  &google_protobuf_compiler_CodeGeneratorResponse_File__submsgs[0],
   &google_protobuf_compiler_CodeGeneratorResponse_File__fields[0],
   UPB_SIZE(40, 72), 4, kUpb_ExtMode_NonExtendable, 2, UPB_FASTTABLE_MASK(255), 0,
 #ifdef UPB_TRACING_ENABLED
@@ -150,14 +151,7 @@ const upb_MiniTable google__protobuf__compiler__CodeGeneratorResponse__File_msg_
 };
 
 const upb_MiniTable* google__protobuf__compiler__CodeGeneratorResponse__File_msg_init_ptr = &google__protobuf__compiler__CodeGeneratorResponse__File_msg_init;
-static const upb_MiniTable *messages_layout[4] = {
-  &google__protobuf__compiler__Version_msg_init,
-  &google__protobuf__compiler__CodeGeneratorRequest_msg_init,
-  &google__protobuf__compiler__CodeGeneratorResponse_msg_init,
-  &google__protobuf__compiler__CodeGeneratorResponse__File_msg_init,
-};
-
-const upb_MiniTableEnum google_protobuf_compiler_CodeGeneratorResponse_Feature_enum_init = {
+const upb_MiniTableEnum google__protobuf__compiler__CodeGeneratorResponse__Feature_enum_init = {
     64,
     0,
     {
@@ -166,8 +160,15 @@ const upb_MiniTableEnum google_protobuf_compiler_CodeGeneratorResponse_Feature_e
     },
 };
 
+static const upb_MiniTable *messages_layout[4] = {
+  &google__protobuf__compiler__Version_msg_init,
+  &google__protobuf__compiler__CodeGeneratorRequest_msg_init,
+  &google__protobuf__compiler__CodeGeneratorResponse_msg_init,
+  &google__protobuf__compiler__CodeGeneratorResponse__File_msg_init,
+};
+
 static const upb_MiniTableEnum *enums_layout[1] = {
-  &google_protobuf_compiler_CodeGeneratorResponse_Feature_enum_init,
+  &google__protobuf__compiler__CodeGeneratorResponse__Feature_enum_init,
 };
 
 const upb_MiniTableFile google_protobuf_compiler_plugin_proto_upb_file_layout = {

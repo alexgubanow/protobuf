@@ -7,7 +7,6 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <ruby/version.h>
 
 #include "convert.h"
 #include "message.h"
@@ -726,7 +725,7 @@ static VALUE FieldDescriptor__type(VALUE _self) {
 static VALUE FieldDescriptor_default(VALUE _self) {
   FieldDescriptor* self = ruby_to_FieldDescriptor(_self);
   const upb_FieldDef* f = self->fielddef;
-  upb_MessageValue default_val = {0};
+  upb_MessageValue default_val = upb_MessageValue_Zero();
   if (upb_FieldDef_IsSubMessage(f)) {
     return Qnil;
   } else if (!upb_FieldDef_IsRepeated(f)) {
@@ -1510,7 +1509,7 @@ static VALUE MethodDescriptor_initialize(VALUE _self, VALUE cookie,
   }
 
   RB_OBJ_WRITE(_self, &self->descriptor_pool, descriptor_pool);
-  self->methoddef = (const upb_ServiceDef*)NUM2ULL(ptr);
+  self->methoddef = (const upb_MethodDef*)NUM2ULL(ptr);
 
   return Qnil;
 }

@@ -10,11 +10,12 @@
 
 #include "absl/log/absl_check.h"
 #include "absl/strings/string_view.h"
-#include "rust/cpp_kernel/cpp_api.h"
+#include "rust/cpp_kernel/serialized_data.h"
+#include "rust/cpp_kernel/strings.h"
 #include "google/protobuf/unittest.pb.h"
 
-using google::protobuf::rust_internal::SerializedData;
-using google::protobuf::rust_internal::SerializeMsg;
+using google::protobuf::rust::SerializedData;
+using google::protobuf::rust::SerializeMsg;
 
 extern "C" void MutateTestAllTypes(protobuf_unittest::TestAllTypes* msg) {
   msg->set_optional_int64(42);
@@ -24,7 +25,7 @@ extern "C" void MutateTestAllTypes(protobuf_unittest::TestAllTypes* msg) {
 
 extern "C" SerializedData SerializeTestAllTypes(
     const protobuf_unittest::TestAllTypes* msg) {
-  SerializedData data(nullptr, 0);
+  SerializedData data;
   ABSL_CHECK(SerializeMsg(msg, &data));
   return data;
 }
@@ -45,7 +46,7 @@ extern "C" void* NewWithExtension() {
   return proto;
 }
 
-extern "C" google::protobuf::rust_internal::PtrAndLen GetBytesExtension(
+extern "C" google::protobuf::rust::PtrAndLen GetBytesExtension(
     const protobuf_unittest::TestAllExtensions* proto) {
   absl::string_view bytes =
       proto->GetExtension(protobuf_unittest::optional_bytes_extension);
@@ -57,4 +58,9 @@ extern "C" int32_t TakeOwnershipAndGetOptionalInt32(
   int32_t i = msg->optional_int32();
   delete msg;
   return i;
+}
+
+extern "C" const void* GetConstStaticTestAllTypes() {
+  static const auto* msg = new protobuf_unittest::TestAllTypes;
+  return msg;
 }

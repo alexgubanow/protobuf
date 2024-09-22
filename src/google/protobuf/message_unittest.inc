@@ -18,9 +18,10 @@
 #include <sys/types.h>
 
 #include <cmath>
-#include <functional>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
-#include <vector>
+#include <string>
 
 #ifndef _MSC_VER
 #include <unistd.h>
@@ -28,6 +29,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "google/protobuf/testing/file.h"
+#include "google/protobuf/testing/file.h"
 #include "google/protobuf/descriptor.pb.h"
 #include <gmock/gmock.h>
 #include "google/protobuf/testing/googletest.h"
@@ -142,8 +145,12 @@ TEST(MESSAGE_TEST_NAME, SerializeToBrokenOstream) {
 }
 
 TEST(MESSAGE_TEST_NAME, ParseFromFileDescriptor) {
-  std::string filename =
-      TestUtil::GetTestDataPath("google/protobuf/testdata/golden_message");
+  std::string filename = absl::StrCat(TestTempDir(), "/golden_message");
+  UNITTEST::TestAllTypes expected_message;
+  TestUtil::SetAllFields(&expected_message);
+  ABSL_CHECK_OK(File::SetContents(
+      filename, expected_message.SerializeAsString(), true));
+
   int file = open(filename.c_str(), O_RDONLY | O_BINARY);
   ASSERT_GE(file, 0);
 
@@ -155,8 +162,12 @@ TEST(MESSAGE_TEST_NAME, ParseFromFileDescriptor) {
 }
 
 TEST(MESSAGE_TEST_NAME, ParsePackedFromFileDescriptor) {
-  std::string filename = TestUtil::GetTestDataPath(
-      "google/protobuf/testdata/golden_packed_fields_message");
+  std::string filename = absl::StrCat(TestTempDir(), "/golden_message");
+  UNITTEST::TestPackedTypes expected_message;
+  TestUtil::SetPackedFields(&expected_message);
+  ABSL_CHECK_OK(File::SetContents(
+      filename, expected_message.SerializeAsString(), true));
+
   int file = open(filename.c_str(), O_RDONLY | O_BINARY);
   ASSERT_GE(file, 0);
 
@@ -781,10 +792,11 @@ TEST(MESSAGE_TEST_NAME, DynamicCastMessage) {
 TEST(MESSAGE_TEST_NAME, DynamicCastMessageInvalidReferenceType) {
   UNITTEST::TestAllTypes test_all_types;
   const MessageLite& test_all_types_pointer_const_ref = test_all_types;
-  ASSERT_DEATH(DynamicCastMessage<UNITTEST::TestRequired>(
-                   test_all_types_pointer_const_ref),
-               "Cannot downcast " + test_all_types.GetTypeName() + " to " +
-                   UNITTEST::TestRequired::default_instance().GetTypeName());
+  ASSERT_DEATH(
+      DynamicCastMessage<UNITTEST::TestRequired>(
+          test_all_types_pointer_const_ref),
+      absl::StrCat("Cannot downcast ", test_all_types.GetTypeName(), " to ",
+                   UNITTEST::TestRequired::default_instance().GetTypeName()));
 }
 
 TEST(MESSAGE_TEST_NAME, DownCastMessageValidType) {
@@ -818,19 +830,28 @@ TEST(MESSAGE_TEST_NAME, DownCastMessageInvalidPointerType) {
 
   ASSERT_DEBUG_DEATH(
       DownCastMessage<UNITTEST::TestRequired>(test_all_types_pointer),
-      "Cannot downcast " + test_all_types.GetTypeName() + " to " +
-          UNITTEST::TestRequired::default_instance().GetTypeName());
+      absl::StrCat("Cannot downcast ", test_all_types.GetTypeName(), " to ",
+                   UNITTEST::TestRequired::default_instance().GetTypeName()));
 }
 
 TEST(MESSAGE_TEST_NAME, DownCastMessageInvalidReferenceType) {
   UNITTEST::TestAllTypes test_all_types;
 
-  MessageLite& test_all_types_pointer = test_all_types;
+  MessageLite& test_all_types_ref = test_all_types;
 
   ASSERT_DEBUG_DEATH(
-      DownCastMessage<UNITTEST::TestRequired>(test_all_types_pointer),
-      "Cannot downcast " + test_all_types.GetTypeName() + " to " +
-          UNITTEST::TestRequired::default_instance().GetTypeName());
+      DownCastMessage<UNITTEST::TestRequired>(test_all_types_ref),
+      absl::StrCat("Cannot downcast ", test_all_types.GetTypeName(), " to ",
+                   UNITTEST::TestRequired::default_instance().GetTypeName()));
+}
+
+TEST(MESSAGE_TEST_NAME, MessageDebugStringMatchesBehindPointerAndLitePointer) {
+  UNITTEST::TestAllTypes test_all_types;
+  test_all_types.set_optional_string("foo");
+  Message* msg_full_pointer = &test_all_types;
+  MessageLite* msg_lite_pointer = &test_all_types;
+  ASSERT_EQ(test_all_types.DebugString(), msg_full_pointer->DebugString());
+  ASSERT_EQ(test_all_types.DebugString(), msg_lite_pointer->DebugString());
 }
 
 #if GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet.
